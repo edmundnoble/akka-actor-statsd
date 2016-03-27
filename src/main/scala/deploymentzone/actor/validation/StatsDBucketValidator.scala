@@ -1,5 +1,7 @@
 package deploymentzone.actor.validation
 
+import scala.util.matching.Regex
+
 /**
  * Validates that a provided name won't cause downstream problems with statsd; that is no reserved characters are
  * present in the name.
@@ -9,9 +11,10 @@ package deploymentzone.actor.validation
  *
  * The reserved characters are colon (":"), pipe ("|"), at-symbol ("@") and backslash ("\").
  */
-private[actor] object StatsDBucketValidator {
-  val RESERVED_CHARACTERS = Seq(":", "|", "@", "\\").mkString("\"", "\", \"", "\"")
-  private val RESERVED_CHARACTERS_PATTERN = """[:|@\\]"""
+private[actor] object StatsDBucketValidator extends (String ⇒ Boolean) {
+  val RESERVED_CHARACTERS = Seq(":", "|", "@", "\\")
+  val RESERVED_CHARACTERS_STRING = RESERVED_CHARACTERS.mkString("\"", "\", \"", "\"")
+  private val RESERVED_CHARACTERS_PATTERN = "[" + Regex.quoteReplacement(RESERVED_CHARACTERS.mkString) + "]"
   private val reserved = RESERVED_CHARACTERS_PATTERN.r
 
   /**

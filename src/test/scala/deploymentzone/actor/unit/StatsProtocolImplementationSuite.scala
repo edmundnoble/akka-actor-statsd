@@ -3,7 +3,7 @@ package deploymentzone.actor.unit
 import deploymentzone.actor._
 import org.scalatest.FunSuiteLike
 import akka.testkit.ImplicitSender
-import akka.actor.{Props, ActorRef, Actor}
+import akka.actor.{Stash, Props, ActorRef, Actor}
 import akka.io.UdpConnected
 import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
@@ -35,6 +35,7 @@ class StatsProtocolImplementationSuite
 
   private class NoOpStatsActor(val connection : ActorRef)
     extends Actor
+    with Stash
     with StatsProtocolImplementation {
 
     override protected[this] val config = Config(ConfigFactory.load())

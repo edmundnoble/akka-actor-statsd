@@ -14,6 +14,8 @@ import deploymentzone.actor.domain.NamespaceTransformer
  */
 class StatsActor(val address: InetSocketAddress, val namespace: String, private val _config: Option[Config] = None)
   extends Actor
+  with Stash
+  with ActorLogging
   with StatsProtocolImplementation {
 
   protected[this] val config = _config.getOrElse(Config(address))

@@ -17,13 +17,13 @@ class ScheduledDispatcherActorSpec
     "initialized with a negative packetSize" should {
       "throw an exception" in new ExceptionCaptureEnvironment(-100, 1000) {
         val ex = expectMsgClass(classOf[ActorInitializationException])
-        ex.getCause.getMessage should be ("requirement failed: " + ScheduledDispatcherActor.PACKET_SIZE_NEGATIVE_ZERO_MESSAGE)
+        ex.getCause.getMessage should be ("requirement failed: " + ScheduledDispatcherActor.PACKET_SIZE_NEGATIVE_ZERO_MESSAGE(-100))
       }
     }
     "initialized with a zero packetSize" should {
       "throw an exception" in new ExceptionCaptureEnvironment(0, 1000) {
         val ex = expectMsgClass(classOf[ActorInitializationException])
-        ex.getCause.getMessage should be ("requirement failed: " + ScheduledDispatcherActor.PACKET_SIZE_NEGATIVE_ZERO_MESSAGE)
+        ex.getCause.getMessage should be ("requirement failed: " + ScheduledDispatcherActor.PACKET_SIZE_NEGATIVE_ZERO_MESSAGE(0))
       }
     }
     "initialized with a negative transmitInterval" should {
@@ -41,10 +41,10 @@ class ScheduledDispatcherActorSpec
 
     "given several messages" when {
       "all messages are queued before the transmitInterval" should {
-        "combine all the messages" in new Environment(250) {
+        "combine all the messages" in new Environment(50) {
           val scheduled = system.actorOf(ScheduledDispatcherActor.props(config, testActor))
           Seq("one", "two", "three", "four").foreach(msg => scheduled ! msg)
-          expectMsg(300.milliseconds,
+          expectMsg(100.milliseconds,
             """one
               |two
               |three
@@ -69,6 +69,7 @@ class ScheduledDispatcherActorSpec
   private class Environment(transmitInterval: Long) {
     protected val baseConfig = ConfigFactory.empty()
       .withValue(s"${Config.path}.transmit-interval", ConfigValueFactory.fromAnyRef(transmitInterval))
+      .withValue(s"${Config.path}.packet-size", ConfigValueFactory.fromAnyRef(Defaults.PACKET_SIZE))
     lazy val config = Config(baseConfig)
   }
 

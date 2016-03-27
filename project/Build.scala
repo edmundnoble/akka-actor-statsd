@@ -45,14 +45,12 @@ object Build extends sbt.Build {
       val akka              = "2.3.4"
       val scalatest         = "2.0"
       val logback           = "1.0.13"
-      val ficus             = "1.0.0"
     }
 
     val compileDependencies = Seq(
       "com.typesafe.akka"   %%  "akka-actor"      % Versions.akka,
       "com.typesafe.akka"   %%  "akka-slf4j"      % Versions.akka,
-      "ch.qos.logback"      %   "logback-classic" % Versions.logback,
-      "net.ceedubs"         %%  "ficus"           % Versions.ficus
+      "ch.qos.logback"      %   "logback-classic" % Versions.logback
     )
 
     val testDependencies = Seq(

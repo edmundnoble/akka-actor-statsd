@@ -4,8 +4,7 @@ import akka.actor.{ActorLogging, Stash, Actor, ActorRef}
 import akka.io.UdpConnected
 
 private[actor] trait StatsProtocolImplementation
-  extends Stash
-  with ActorLogging { this: Actor =>
+  { this: Actor with Stash =>
 
   protected def connection: ActorRef
   private var scheduledDispatcher: ActorRef = _

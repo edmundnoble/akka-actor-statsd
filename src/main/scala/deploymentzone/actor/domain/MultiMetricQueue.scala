@@ -1,6 +1,6 @@
 package deploymentzone.actor.domain
 
-import scala.collection.immutable
+import scala.collection.{mutable, immutable}
 import deploymentzone.actor.PacketSize
 import scala.annotation.tailrec
 import java.nio.charset.Charset
@@ -22,16 +22,16 @@ import akka.actor.ActorSystem
 private[actor] class MultiMetricQueue(val packetSize: Int)(implicit system: ActorSystem) {
   val logger = Logging(system.eventStream, classOf[MultiMetricQueue])
 
-  private var queue = immutable.Queue[String]()
+  private val queue = mutable.Queue[String]()
 
   /**
    * Enqueues a message for future dispatch.
-   * @param message message to enqueue
+    *
+    * @param message message to enqueue
    * @return this instance (for convenience chaining)
    */
-  def enqueue(message: String) = {
-    queue = queue.enqueue(message)
-    this
+  def enqueue(message: String): Unit = {
+    queue.enqueue(message)
   }
 
   /**
@@ -42,6 +42,7 @@ private[actor] class MultiMetricQueue(val packetSize: Int)(implicit system: Acto
    * @return number of messages remaining in the queue.
    */
   def size: Int = queue.size
+
   /**
    * Creates a StatsD payload message from a list of messages up to the [[packetSize]] limit
    * in bytes taking UTF-8 size into account.
@@ -51,34 +52,35 @@ private[actor] class MultiMetricQueue(val packetSize: Int)(implicit system: Acto
    * @return Newline separated list of StatsD messages up to the maximum [[packetSize]]
    */
   def payload(): Option[String] = {
-    @tailrec
-    def recurse(acc: StringBuilder = new StringBuilder, utf8Length: Int = 0): String = {
-      val UTF8 = Charset.forName("utf-8")
+    val UTF8 = Charset.forName("utf-8")
+    val builder = new StringBuilder
 
-      queue.isEmpty match {
-        case true => acc.toString()
-        case false =>
-          queue.head.getBytes(UTF8).length match {
-            case proposedAddition if proposedAddition > packetSize =>
-              DroppedMessageWarning(proposedAddition, queue.head)
-              val (_, sq) = queue.dequeue
-              queue = sq
-              recurse(acc, utf8Length)
-            case proposedAddition if proposedAddition + utf8Length + 1 > (packetSize + 1) =>
-              acc.toString()
-            case proposedAddition =>
-              val (item, sq) = queue.dequeue
-              queue = sq
-              acc.append(item)
-              acc.append("\n")
-              recurse(acc, proposedAddition + utf8Length)
-          }
+    @tailrec
+    def recurse(utf8Length: Int = 0): String = {
+      if (queue.isEmpty) {
+        builder.toString()
+      } else {
+        val proposedAddition = queue.head.getBytes(UTF8).length
+          if (proposedAddition > packetSize) {
+            DroppedMessageWarning(proposedAddition, queue.head)
+            queue.dequeue
+            recurse(utf8Length)
+          } else if (proposedAddition + utf8Length + 1 > (packetSize + 1)) {
+            builder.toString()
+          } else {
+            val item = queue.dequeue
+            builder.append(item)
+            builder.append("\n")
+            recurse(proposedAddition + utf8Length)
+        }
       }
     }
 
-    recurse().stripLineEnd match {
-      case result if result.length > 0 => Some(result)
-      case _ => None
+    val result = recurse().stripLineEnd
+    if (result.length > 0) {
+      Some(result)
+    } else {
+      None
     }
   }
 
@@ -89,12 +91,9 @@ private[actor] class MultiMetricQueue(val packetSize: Int)(implicit system: Acto
 
       val DISCARD_MSG_MAX_LENGTH = 25
       val discardMsgLength = message.length
-      val ellipsis = discardMsgLength match {
-        case n if n > DISCARD_MSG_MAX_LENGTH => "..."
-        case _ => ""
-      }
+      val ellipsis = if (discardMsgLength > DISCARD_MSG_MAX_LENGTH) "..." else ""
       val discardMsg = message.substring(0, Math.min(DISCARD_MSG_MAX_LENGTH, discardMsgLength)) + ellipsis
-      logger.warning(s"""Message "$discardMsg" discarded because its size ($proposedAddition) was larger than the permitted maximum packet size ($packetSize)""")
+      logger.warning(s"""Message dropped, length $proposedAddition larger than max. packet size $packetSize: $discardMsg""")
     }
   }
 }
@@ -105,6 +104,6 @@ object MultiMetricQueue {
    *
    * @param packetSize maximum packet size for a single aggregated message
    */
-  def apply(packetSize: Int = PacketSize.GIGABIT_ETHERNET)(implicit system: ActorSystem) =
+  def apply(packetSize: Int)(implicit system: ActorSystem) =
     new MultiMetricQueue(packetSize)(system)
 }
