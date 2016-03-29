@@ -3,7 +3,7 @@ package deploymentzone.actor
 import akka.util.ByteString
 import deploymentzone.actor.validation.StatsDBucketValidator
 
-class Metric[@specialized T](symbol: String, bucket: String, samplingRate: Double) {
+private[actor] class Metric[@specialized(Int, Long, Double) T](symbol: String, bucket: String, samplingRate: Double) {
   require(StatsDBucketValidator(bucket),
     s"""reserved characters (${StatsDBucketValidator.RESERVED_CHARACTERS}) may not be used in buckets and buckets may not start or end with a period (".")""")
 
@@ -15,7 +15,7 @@ class Metric[@specialized T](symbol: String, bucket: String, samplingRate: Doubl
   }
   final val prefix = ByteString(bucket) ++ ByteString(':')
 
-  def renderValue(t: T): ByteString = ByteString(t.toString)
+  def renderValue(t: T): ByteString = ByteString(String.valueOf(t))
 
   final def apply(t: T): MaterializedMetric =
     MaterializedMetric(prefix ++ renderValue(t) ++ suffix)
@@ -23,14 +23,16 @@ class Metric[@specialized T](symbol: String, bucket: String, samplingRate: Doubl
 }
 
 object Metric {
-  def apply[@specialized T](symbol: String, bucket: String, samplingRate: Double): Metric[T] =
+  private[actor] def apply[@specialized T](symbol: String, bucket: String, samplingRate: Double): Metric[T] =
     new Metric(symbol, bucket, samplingRate)
 }
 
 case class MaterializedMetric(bytes: ByteString)
 
 class Count(bucket: String, samplingRate: Double = 1.0)
-  extends Metric[Int](Count.SYMBOL, bucket, samplingRate)
+  extends Metric[Int](Count.SYMBOL, bucket, samplingRate) {
+  override def renderValue(i: Int) = ByteString(String.valueOf(i))
+}
 
 object Count {
   val SYMBOL = "c"
@@ -43,7 +45,9 @@ object Count {
 }
 
 class Gauge(bucket: String, samplingRate: Double)
-  extends Metric[Long](Gauge.SYMBOL, bucket, samplingRate)
+  extends Metric[Long](Gauge.SYMBOL, bucket, samplingRate) {
+  override def renderValue(l: Long) = ByteString(String.valueOf(l))
+}
 
 object Gauge {
   val SYMBOL = "g"
@@ -53,7 +57,7 @@ object Gauge {
 
 class GaugeAdd(bucket: String, samplingRate: Double)
   extends Gauge(bucket, samplingRate) {
-  override def renderValue(t: Long) = ByteString(s"+${Math.abs(t)}")
+  override def renderValue(t: Long) = ByteString('+') ++ ByteString(String.valueOf(Math.abs(t)))
 }
 
 object GaugeAdd {
@@ -63,7 +67,7 @@ object GaugeAdd {
 
 class GaugeSubtract(bucket: String, samplingRate: Double)
   extends Gauge(bucket, samplingRate) {
-  override def renderValue(t: Long) = ByteString(s"-${Math.abs(t)}")
+  override def renderValue(t: Long) = ByteString('-') ++ ByteString(String.valueOf(Math.abs(t)))
 }
 
 object GaugeSubtract {
@@ -72,7 +76,9 @@ object GaugeSubtract {
 }
 
 class Set(bucket: String, samplingRate: Double = 1.0)
-  extends Metric[Long](Set.SYMBOL, bucket, samplingRate)
+  extends Metric[Long](Set.SYMBOL, bucket, samplingRate) {
+  override def renderValue(l: Long) = ByteString(String.valueOf(l))
+}
 
 object Set {
   val SYMBOL = "s"
@@ -85,7 +91,7 @@ import scala.concurrent.duration.Duration
 
 class Timing(bucket: String, samplingRate: Double = 1.0)
   extends Metric[Duration](Timing.SYMBOL, bucket, samplingRate) {
-  override def renderValue(t: Duration) = ByteString(t.toMillis.toString)
+  override def renderValue(t: Duration) = ByteString(String.valueOf(t.toMillis))
 }
 
 object Timing {

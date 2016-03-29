@@ -111,7 +111,7 @@ class ProtocolSpec
   }
 
   private class Implementation[T](value: T, samplingRate: Double = 1.0) {
-    val subject = Metric("x", "deploymentzone.sprockets", samplingRate)(value)
+    val subject = Metric[T]("x", "deploymentzone.sprockets", samplingRate)(value)
   }
 
 
