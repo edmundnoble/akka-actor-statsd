@@ -3,11 +3,7 @@ package deploymentzone.actor.domain
 import scala.collection.{immutable, mutable}
 import deploymentzone.actor.PacketSize
 
-import scala.annotation.tailrec
-import java.nio.charset.Charset
-
 import akka.event.{Logging, LoggingAdapter}
-import akka.actor.ActorSystem
 import akka.util.ByteString
 
 /**
@@ -26,6 +22,7 @@ private[actor] class MultiMetricQueue(val packetSize: Int,
                                       val handleDroppedMessage: ByteString => Unit) {
 
   private val queue = mutable.Queue[ByteString]()
+  private var last: Option[ByteString] = None
 
   /**
     * Enqueues a message for future dispatch.
@@ -37,7 +34,16 @@ private[actor] class MultiMetricQueue(val packetSize: Int,
     if (message.length > packetSize) {
       handleDroppedMessage(message)
     } else {
-      queue.enqueue(message)
+      last = last.fold { Some(message) } { h => Some(merge(message, h)) }
+    }
+  }
+
+  private def merge(message: ByteString, h: ByteString): ByteString = {
+    if (message.length + h.length > packetSize) {
+      queue.enqueue(h)
+      message
+    } else {
+      h ++ MultiMetricQueue.NEWLINE ++ message
     }
   }
 
@@ -59,31 +65,10 @@ private[actor] class MultiMetricQueue(val packetSize: Int,
     * @return Newline separated list of StatsD messages up to the maximum [[packetSize]]
     */
   def payload(): Option[ByteString] = {
-    @tailrec
-    def recurse(lengthSoFar: Int = 0, acc: ByteString): ByteString = {
-      if (queue.isEmpty) {
-        acc
-      } else {
-        val proposedAddition = queue.head.length
-        if (proposedAddition + lengthSoFar > packetSize) {
-          acc
-        } else {
-          val nextItem = queue.dequeue
-          recurse(proposedAddition + lengthSoFar, acc ++ MultiMetricQueue.NEWLINE ++ nextItem)
-        }
-      }
-    }
-
-    if (queue.isEmpty) {
-      None
+    if (queue.nonEmpty) {
+      Some(queue.dequeue())
     } else {
-      val top = queue.dequeue
-      val result = recurse(top.length, top)
-      if (result.nonEmpty) {
-        Some(result)
-      } else {
-        None
-      }
+      last.fold[Option[ByteString]] { None } { l => last = None; Some(l) }
     }
   }
 
