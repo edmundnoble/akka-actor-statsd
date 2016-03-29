@@ -7,7 +7,7 @@ class Metric[@specialized T](symbol: String, bucket: String, samplingRate: Doubl
   require(StatsDBucketValidator(bucket),
     s"""reserved characters (${StatsDBucketValidator.RESERVED_CHARACTERS}) may not be used in buckets and buckets may not start or end with a period (".")""")
 
-  final val suffix = ByteString("|") ++ {
+  final val suffix = ByteString('|') ++ {
     if (samplingRate != 1.0)
       ByteString(symbol) ++ ByteString("|@") ++ ByteString(samplingRate.toString)
     else
