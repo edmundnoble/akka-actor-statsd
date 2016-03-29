@@ -7,7 +7,7 @@ import akka.util.ByteString
 /* originated from: http://doc.akka.io/docs/akka/snapshot/scala/io-udp.html */
 
 /* by using a connected form instead of a simple sender, security checks are cached instead of verified on every send */
-private[actor] class UdpConnectedActor(val config: Config, val requester: ActorRef)
+private[actor] class UdpConnectedActor(val config: StatsConfig, val requester: ActorRef)
   extends Actor
   with ActorLogging {
 
@@ -23,8 +23,8 @@ private[actor] class UdpConnectedActor(val config: Config, val requester: ActorR
   }
 
   def ready(connection: ActorRef): Receive = {
-    case msg: String =>
-      connection ! UdpConnected.Send(ByteString(msg))
+    case msg: ByteString =>
+      connection ! UdpConnected.Send(msg)
     case d @ UdpConnected.Disconnect => connection ! d
     case UdpConnected.Disconnected   => context.stop(self)
     case f : UdpConnected.CommandFailed =>
@@ -41,5 +41,5 @@ private[actor] class UdpConnectedActor(val config: Config, val requester: ActorR
 }
 
 private[actor] object UdpConnectedActor {
-  def props(config: Config, requester: ActorRef) = Props(new UdpConnectedActor(config, requester))
+  def props(config: StatsConfig, requester: ActorRef) = Props(new UdpConnectedActor(config, requester))
 }

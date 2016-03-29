@@ -10,22 +10,19 @@ class ProtocolSpec
 
   "A Metric implementation" when {
     "creating a new instance" should {
-      "not permit null buckets" in {
-        an [IllegalArgumentException] should be thrownBy new Metric(null, 1.0)(1) { override val symbol = "y" }
-      }
       "not permit buckets with reserved character names" in {
-        an [IllegalArgumentException] should be thrownBy new Metric("a:name", 1.0)(1) { override val symbol = "z" }
+        an [IllegalArgumentException] should be thrownBy new Metric("z", "a:name", 1.0)(1)
       }
     }
     "invoking toString" when {
       "using a 1.0 sampling rate" should {
         "return the expected value" in new Implementation(123) {
-          subject.toString should be ("deploymentzone.sprockets:123|x")
+          subject.bytes.utf8String should be ("deploymentzone.sprockets:123|x")
         }
       }
       "using a 5.6 sampling rate" should {
         "return the expected value" in new Implementation(1337, 5.6) {
-          subject.toString should be ("deploymentzone.sprockets:1337|x|@5.6")
+          subject.bytes.utf8String should be ("deploymentzone.sprockets:1337|x|@5.6")
         }
       }
     }
@@ -34,7 +31,7 @@ class ProtocolSpec
   "Count" when {
     "invoking toString" should {
       "return the expected value" in {
-        Count("x.z")(9).toString should be ("x.z:9|c")
+        Count("x.z")(9).bytes.utf8String should be ("x.z:9|c")
       }
     }
   }
@@ -42,7 +39,7 @@ class ProtocolSpec
   "Increment" when {
     "invoking toString" should {
       "return the expected value" in {
-        Increment("a.b").toString should be ("a.b:1|c")
+        Count.increment("a.b").bytes.utf8String should be ("a.b:1|c")
       }
     }
   }
@@ -50,7 +47,7 @@ class ProtocolSpec
   "Decrement" when {
     "invoking toString" should {
       "return the expected value" in {
-        Decrement("c.d").toString should be ("c.d:-1|c")
+        Count.decrement("c.d").bytes.utf8String should be ("c.d:-1|c")
       }
     }
   }
@@ -58,7 +55,7 @@ class ProtocolSpec
   "Gauge" when {
     "invoking toString" should {
       "return the expected value" in {
-        Gauge("e.f")(900L).toString should be ("e.f:900|g")
+        Gauge("e.f")(900L).bytes.utf8String should be ("e.f:900|g")
       }
     }
   }
@@ -66,12 +63,12 @@ class ProtocolSpec
   "GaugeAdd" when {
     "invoking toString" should {
       "return the expected value" in {
-        GaugeAdd("m.n")(34).toString should be ("m.n:+34|g")
+        GaugeAdd("m.n")(34).bytes.utf8String should be ("m.n:+34|g")
       }
     }
     "invoking toString on a negative number" should {
       "replace the negation sign with a positive sign" in {
-        GaugeAdd("n.o")(-96).toString should be ("n.o:+96|g")
+        GaugeAdd("n.o")(-96).bytes.utf8String should be ("n.o:+96|g")
       }
     }
   }
@@ -79,12 +76,12 @@ class ProtocolSpec
   "GaugeSubtract" when {
     "invoking toString" should {
       "return the expected value" in {
-        GaugeSubtract("m.n")(34).toString should be ("m.n:-34|g")
+        GaugeSubtract("m.n")(34).bytes.utf8String should be ("m.n:-34|g")
       }
     }
     "invoking toString on a negative number" should {
       "not have two negative signs" in {
-        GaugeSubtract("n.o")(-96).toString should be ("n.o:-96|g")
+        GaugeSubtract("n.o")(-96).bytes.utf8String should be ("n.o:-96|g")
       }
     }
   }
@@ -93,12 +90,12 @@ class ProtocolSpec
     "invoking toString" when {
       "using a Long to represent milliseconds" should {
         "return the expected value" in {
-          Timing("q.z")(4000.millis).toString should be ("q.z:4000|ms")
+          Timing("q.z")(4000.millis).bytes.utf8String should be ("q.z:4000|ms")
         }
       }
       "using 23 seconds" should {
         "return the expected value" in {
-          Timing("r.x")(23.seconds).toString should be ("r.x:23000|ms")
+          Timing("r.x")(23.seconds).bytes.utf8String should be ("r.x:23000|ms")
         }
       }
 
@@ -108,13 +105,13 @@ class ProtocolSpec
   "Set" when {
     "invoking toString" should {
       "return the expected value" in {
-        Set("n.q")(12).toString should be ("n.q:12|s")
+        Set("n.q")(12).bytes.utf8String should be ("n.q:12|s")
       }
     }
   }
 
   private class Implementation[T](value: T, samplingRate: Double = 1.0) {
-    val subject = new Metric("deploymentzone.sprockets", samplingRate)(value) { override val symbol = "x" }
+    val subject = Metric("x", "deploymentzone.sprockets", samplingRate)(value)
   }
 
 

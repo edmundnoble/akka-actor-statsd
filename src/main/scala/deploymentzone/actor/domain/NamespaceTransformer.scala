@@ -1,28 +1,29 @@
 package deploymentzone.actor.domain
 
-import deploymentzone.actor.Metric
+import akka.util.ByteString
+import deploymentzone.actor.{MaterializedMetric, Metric}
 import deploymentzone.actor.validation.StatsDBucketValidator
 
 /**
  * Transforms the toString result value of a CounterMessage instance to include an
  * optional namespace.
  */
-private[actor] class NamespaceTransformer(val namespace: String) extends ((Metric[_]) => String) {
+private[actor] class NamespaceTransformer(val namespace: ByteString) extends (MaterializedMetric => ByteString) {
 
-  require(StatsDBucketValidator(namespace))
+  import NamespaceTransformer._
 
-  override def apply(counter: Metric[_]): String = {
-    require(counter != null)
+  require(StatsDBucketValidator(namespace.utf8String))
 
-    val intermediate = counter.toString
-    namespace match {
-      case null => intermediate
-      case "" => intermediate
-      case _ => s"$namespace.$intermediate"
+  override def apply(metric: MaterializedMetric): ByteString = {
+    if (namespace.isEmpty) {
+      metric.bytes
+    } else {
+      namespace ++ NAMESPACE_SEPARATOR ++ metric.bytes
     }
   }
 }
 
 private[actor] object NamespaceTransformer {
-  def apply(namespace: String) = new NamespaceTransformer(namespace)
+  val NAMESPACE_SEPARATOR = ByteString('.')
+  def apply(namespace: String) = new NamespaceTransformer(ByteString(namespace))
 }

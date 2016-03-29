@@ -20,14 +20,11 @@ private[actor] object StatsDBucketValidator extends (String ⇒ Boolean) {
   /**
    * Validates that a string contains no special characters.
    *
-   * Passes null values as valid since they are ignored downstream as if they were an empty string.
-   *
    * @param name string to validate.
    */
   def apply(name: String): Boolean =
-    name == null ||
-      (reserved.findFirstIn(name).fold(true)(_ => false) &&
+      reserved.findFirstIn(name).fold(true)(_ => false) &&
       !name.startsWith(".") &&
-      !name.endsWith("."))
+      !name.endsWith(".")
 
 }

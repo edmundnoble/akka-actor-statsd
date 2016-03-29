@@ -5,7 +5,9 @@ import akka.actor._
 import deploymentzone.actor.domain.MultiMetricQueue
 import java.util.concurrent.TimeUnit
 
-private[actor] class ScheduledDispatcherActor(config: Config, val receiver: ActorRef)
+import akka.util.ByteString
+
+private[actor] class ScheduledDispatcherActor(config: StatsConfig, val receiver: ActorRef)
   extends Actor
   with ActorLogging {
 
@@ -25,12 +27,12 @@ private[actor] class ScheduledDispatcherActor(config: Config, val receiver: Acto
     log.warning("Transmit interval set to a large value of {} milliseconds", transmitInterval)
   }
 
-  val mmq = MultiMetricQueue(packetSize)(system)
+  val mmq = MultiMetricQueue(packetSize, log)
 
   val recurringTransmit: Cancellable = system.scheduler.schedule(transmitInterval, transmitInterval, self, Transmit)(system.dispatcher, self)
 
   def receive = {
-    case msg: String => mmq.enqueue(msg)
+    case msg: ByteString => mmq.enqueue(msg)
     case Transmit =>
       mmq.payload().foreach(payload => receiver ! payload)
   }
@@ -46,5 +48,5 @@ private[actor] object ScheduledDispatcherActor {
   def PACKET_SIZE_NEGATIVE_ZERO_MESSAGE(packetSize: Int) = s"packetSize $packetSize cannot be negative or 0"
   val TRANSMIT_INTERVAL_NEGATIVE_ZERO_MESSAGE = "transmitInterval cannot be negative or 0"
 
-  def props(config: Config, receiver: ActorRef): Props = Props(new ScheduledDispatcherActor(config, receiver))
+  def props(config: StatsConfig, receiver: ActorRef): Props = Props(new ScheduledDispatcherActor(config, receiver))
 }

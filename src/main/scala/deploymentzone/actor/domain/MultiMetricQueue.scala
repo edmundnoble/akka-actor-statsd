@@ -1,109 +1,114 @@
 package deploymentzone.actor.domain
 
-import scala.collection.{mutable, immutable}
+import scala.collection.{immutable, mutable}
 import deploymentzone.actor.PacketSize
+
 import scala.annotation.tailrec
 import java.nio.charset.Charset
-import akka.event.Logging
+
+import akka.event.{Logging, LoggingAdapter}
 import akka.actor.ActorSystem
+import akka.util.ByteString
 
 /**
- * Logic for combining messages so they won't cross a predetermined packet size boundary.
- *
- * Takes UTF-8 byte size into account for messages.
- *
- * When a single message is larger than the provided [[packetSize]] that message is dropped
- * with a log warning.
- *
- * This class is not thread-safe.
- *
- * @param packetSize maximum byte size that is permitted for any given payload
- */
-private[actor] class MultiMetricQueue(val packetSize: Int)(implicit system: ActorSystem) {
-  val logger = Logging(system.eventStream, classOf[MultiMetricQueue])
+  * Logic for combining messages so they won't cross a predetermined packet size boundary.
+  *
+  * Takes UTF-8 byte size into account for messages.
+  *
+  * When a single message is larger than the provided [[packetSize]] that message is dropped
+  * with a log warning.
+  *
+  * This class is not thread-safe.
+  *
+  * @param packetSize maximum byte size that is permitted for any given payload
+  */
+private[actor] class MultiMetricQueue(val packetSize: Int,
+                                      val handleDroppedMessage: ByteString => Unit) {
 
-  private val queue = mutable.Queue[String]()
+  private val queue = mutable.Queue[ByteString]()
 
   /**
-   * Enqueues a message for future dispatch.
+    * Enqueues a message for future dispatch.
     *
     * @param message message to enqueue
-   * @return this instance (for convenience chaining)
-   */
-  def enqueue(message: String): Unit = {
-    queue.enqueue(message)
+    * @return this instance (for convenience chaining)
+    */
+  def enqueue(message: ByteString): Unit = {
+    if (message.length > packetSize) {
+      handleDroppedMessage(message)
+    } else {
+      queue.enqueue(message)
+    }
   }
 
   /**
-   * The remaining number of messages in the queue.
-   *
-   * Primarily provided for instrumentation and testing.
-   *
-   * @return number of messages remaining in the queue.
-   */
+    * The remaining number of messages in the queue.
+    *
+    * Primarily provided for instrumentation and testing.
+    *
+    * @return number of messages remaining in the queue.
+    */
   def size: Int = queue.size
 
   /**
-   * Creates a StatsD payload message from a list of messages up to the [[packetSize]] limit
-   * in bytes taking UTF-8 size into account.
-   *
-   * Items that are added to the payload are also removed from the queue.
-   *
-   * @return Newline separated list of StatsD messages up to the maximum [[packetSize]]
-   */
-  def payload(): Option[String] = {
-    val UTF8 = Charset.forName("utf-8")
-    val builder = new StringBuilder
-
+    * Creates a StatsD payload message from the next items in the queue, which will be as large as possible up to
+    * [[packetSize]].
+    *
+    * Items that are added to the payload are also removed from the queue.
+    *
+    * @return Newline separated list of StatsD messages up to the maximum [[packetSize]]
+    */
+  def payload(): Option[ByteString] = {
     @tailrec
-    def recurse(utf8Length: Int = 0): String = {
+    def recurse(lengthSoFar: Int = 0, acc: ByteString): ByteString = {
       if (queue.isEmpty) {
-        builder.toString()
+        acc
       } else {
-        val proposedAddition = queue.head.getBytes(UTF8).length
-          if (proposedAddition > packetSize) {
-            DroppedMessageWarning(proposedAddition, queue.head)
-            queue.dequeue
-            recurse(utf8Length)
-          } else if (proposedAddition + utf8Length + 1 > (packetSize + 1)) {
-            builder.toString()
-          } else {
-            val item = queue.dequeue
-            builder.append(item)
-            builder.append("\n")
-            recurse(proposedAddition + utf8Length)
+        val proposedAddition = queue.head.length
+        if (proposedAddition + lengthSoFar > packetSize) {
+          acc
+        } else {
+          val nextItem = queue.dequeue
+          recurse(proposedAddition + lengthSoFar, acc ++ MultiMetricQueue.NEWLINE ++ nextItem)
         }
       }
     }
 
-    val result = recurse().stripLineEnd
-    if (result.length > 0) {
-      Some(result)
-    } else {
+    if (queue.isEmpty) {
       None
+    } else {
+      val top = queue.dequeue
+      val result = recurse(top.length, top)
+      if (result.nonEmpty) {
+        Some(result)
+      } else {
+        None
+      }
     }
   }
 
-  private object DroppedMessageWarning extends ((Int, String) => Unit) {
-    def apply(proposedAddition: Int, message: String) {
-      if (!logger.isWarningEnabled)
-        return
-
-      val DISCARD_MSG_MAX_LENGTH = 25
-      val discardMsgLength = message.length
-      val ellipsis = if (discardMsgLength > DISCARD_MSG_MAX_LENGTH) "..." else ""
-      val discardMsg = message.substring(0, Math.min(DISCARD_MSG_MAX_LENGTH, discardMsgLength)) + ellipsis
-      logger.warning(s"""Message dropped, length $proposedAddition larger than max. packet size $packetSize: $discardMsg""")
-    }
-  }
 }
 
 object MultiMetricQueue {
   /**
-   * Creates an instance of MultiMetricQueue.
-   *
-   * @param packetSize maximum packet size for a single aggregated message
-   */
-  def apply(packetSize: Int)(implicit system: ActorSystem) =
-    new MultiMetricQueue(packetSize)(system)
+    * Creates an instance of MultiMetricQueue.
+    *
+    * @param packetSize maximum packet size for a single aggregated message
+    */
+  def apply(packetSize: Int, logger: LoggingAdapter) =
+    new MultiMetricQueue(packetSize, droppedMessageWarning(packetSize, logger))
+
+  private[actor] def apply(packetSize: Int) = new MultiMetricQueue(packetSize, _ => ())
+
+  def droppedMessageWarning(packetSize: Int, logger: LoggingAdapter): (ByteString => Unit) = { message =>
+    if (logger.isWarningEnabled) {
+      val DISCARD_MSG_MAX_LENGTH = 30
+      val discardMsgLength = message.length
+      val ellipsis = if (discardMsgLength > DISCARD_MSG_MAX_LENGTH) "..." else ""
+      val discardMsg = message.slice(0, Math.min(DISCARD_MSG_MAX_LENGTH, discardMsgLength)).utf8String + ellipsis
+      logger.warning(s"""Message dropped, length $discardMsgLength larger than max. packet size $packetSize: $discardMsg""")
+    }
+  }
+
+  val NEWLINE = ByteString('\n')
 }

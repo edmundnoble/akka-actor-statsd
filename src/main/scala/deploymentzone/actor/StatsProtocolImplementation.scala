@@ -1,16 +1,17 @@
 package deploymentzone.actor
 
-import akka.actor.{ActorLogging, Stash, Actor, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef, Stash}
 import akka.io.UdpConnected
+import akka.util.ByteString
 
 private[actor] trait StatsProtocolImplementation
-  { this: Actor with Stash =>
+  { this: Actor with Stash with ActorLogging =>
 
   protected def connection: ActorRef
   private var scheduledDispatcher: ActorRef = _
-  protected[this] val config: Config
+  protected[this] val config: StatsConfig
 
-  protected def process(msg: Metric[_]): String
+  protected def process(msg: MaterializedMetric): ByteString
 
   override def preStart() {
     connection ! UdpConnected.Connect
@@ -23,11 +24,11 @@ private[actor] trait StatsProtocolImplementation
     case UdpConnected.Connected =>
       unstashAll()
       context.become(connected)
-    case _ => stash()
+    case x => stash()
   }
   
   protected def connected: Actor.Receive = {
-    case msg: Metric[_] =>
+    case msg: MaterializedMetric =>
       scheduledDispatcher ! process(msg)
   }
 }

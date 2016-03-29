@@ -6,15 +6,15 @@ object Build extends sbt.Build {
   lazy val project = Project(
     id = "akka-actor-statsd",
     base = file("."),
-    settings = Project.defaultSettings ++ Seq(
+    settings = Defaults.coreDefaultSettings ++ Seq(
       name                  := "akka-actor-statsd",
       organization          := "com.deploymentzone",
       version               := "0.4-SNAPSHOT",
       licenses              := Seq("MIT" -> url("http://opensource.org/licenses/MIT")),
       homepage              := Some(url("https://github.com/cfeduke/akka-actor-statsd/")),
-      scalaVersion          := "2.10.4",
+      scalaVersion          := "2.11.7",
       scalacOptions         := Seq("-deprecation", "-feature", "-encoding", "utf8"),
-      libraryDependencies   ++= Dependencies(),
+      libraryDependencies   ++= Dependencies.allDeps,
       publishMavenStyle     := true,
       publishTo := {
         val nexus = "https://oss.sonatype.org/"
@@ -42,9 +42,9 @@ object Build extends sbt.Build {
   object Dependencies {
 
     object Versions {
-      val akka              = "2.3.4"
-      val scalatest         = "2.0"
-      val logback           = "1.0.13"
+      val akka              = "2.3.11"
+      val scalatest         = "2.2.6"
+      val logback           = "1.1.6"
     }
 
     val compileDependencies = Seq(
@@ -58,7 +58,7 @@ object Build extends sbt.Build {
       "org.scalatest"       %% "scalatest"        % Versions.scalatest    % "test"
     )
 
-    def apply(): Seq[ModuleID] = compileDependencies ++ testDependencies
+    val allDeps: Seq[ModuleID] = compileDependencies ++ testDependencies
 
   }
 
