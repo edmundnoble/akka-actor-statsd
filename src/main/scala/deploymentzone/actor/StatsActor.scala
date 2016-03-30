@@ -23,7 +23,7 @@ class StatsActor(val config: StatsConfig)
 
   override def connection = _connection
 
-  override def process(msg: MaterializedMetric): ByteString = namespaceTx(msg)
+  override def process(msg: MaterializedMetric): Option[ByteString] = namespaceTx(msg, config.packetSize)
 
 }
 

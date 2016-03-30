@@ -13,7 +13,8 @@ import com.typesafe.config.ConfigFactory
 class StatsProtocolImplementationSuite
   extends TestKit("stats-protocol-implementation-suite")
   with FunSuiteLike
-  with ImplicitSender {
+  with ImplicitSender
+  with TestBase {
 
   test("connects and then relays a message") {
     val stats = system.actorOf(NoOpStatsActor.props(testActor))
@@ -43,7 +44,7 @@ class StatsProtocolImplementationSuite
 
     override protected[this] val config = StatsConfig("invalid_hostname")
 
-    override protected def process(msg: MaterializedMetric) = msg.bytes
+    override protected def process(msg: MaterializedMetric) = Some(noLengthLimit(msg))
 
   }
 

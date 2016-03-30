@@ -23,6 +23,7 @@ private[actor] class MultiMetricQueue(val packetSize: Int,
 
   private val queue = mutable.Queue[ByteString]()
   private var last: Option[ByteString] = None
+  private var _bytesQueued: Long = 0
 
   /**
     * Enqueues a message for future dispatch.
@@ -34,7 +35,8 @@ private[actor] class MultiMetricQueue(val packetSize: Int,
     if (message.length > packetSize) {
       handleDroppedMessage(message)
     } else {
-      last = last.fold { Some(message) } { h => Some(merge(message, h)) }
+      last = last.fold { _bytesQueued += message.length; Some(message) }
+                       { h => _bytesQueued += message.length + 1; Some(merge(message, h)) }
     }
   }
 
@@ -56,20 +58,24 @@ private[actor] class MultiMetricQueue(val packetSize: Int,
     */
   def size: Int = queue.size
 
+  def bytesQueued: Long = _bytesQueued
+
   /**
-    * Creates a StatsD payload message from the next items in the queue, which will be as large as possible up to
-    * [[packetSize]].
+    * Makes a StatsD payload message from the next items in the queue, which will be as large as possible up to [[packetSize]].
     *
     * Items that are added to the payload are also removed from the queue.
     *
     * @return Newline separated list of StatsD messages up to the maximum [[packetSize]]
     */
   def payload(): Option[ByteString] = {
+    val result =
     if (queue.nonEmpty) {
       Some(queue.dequeue())
     } else {
       last.fold[Option[ByteString]] { None } { l => last = None; Some(l) }
     }
+    result.foreach(_bytesQueued -= _.length)
+    result
   }
 
 }

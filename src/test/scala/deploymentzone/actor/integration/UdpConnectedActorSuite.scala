@@ -1,6 +1,6 @@
 package deploymentzone.actor.integration
 
-import deploymentzone.actor.{StatsConfig, TestKit, UdpConnectedActor, UdpListenerActor}
+import deploymentzone.actor._
 import org.scalatest.FunSuiteLike
 import akka.testkit.ImplicitSender
 import java.net.InetSocketAddress
@@ -11,7 +11,8 @@ import akka.util.ByteString
 class UdpConnectedActorSuite
   extends TestKit("udp-connected-actor-suite")
   with FunSuiteLike
-  with ImplicitSender {
+  with ImplicitSender
+  with TestBase {
 
   test("sends data") {
     val listener = system.actorOf(UdpListenerActor.props(testActor))
@@ -20,7 +21,7 @@ class UdpConnectedActorSuite
     connected ! UdpConnected.Connect
     expectMsg(UdpConnected.Connected)
     connected ! ByteString("data")
-    expectMsg("data")
+    expectMsg(ByteString("data"))
     connected ! UdpConnected.Disconnect
     listener ! Udp.Unbind
   }

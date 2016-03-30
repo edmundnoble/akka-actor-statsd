@@ -1,12 +1,15 @@
 package deploymentzone.actor.unit
 
+import akka.util.ByteString
 import org.scalatest.{Matchers, WordSpec}
+
 import scala.concurrent.duration._
 import deploymentzone.actor._
 
 class ProtocolSpec
   extends WordSpec
-  with Matchers {
+  with Matchers
+  with TestBase {
 
   "A Metric implementation" when {
     "creating a new instance" should {

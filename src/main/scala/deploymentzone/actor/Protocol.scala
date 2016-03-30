@@ -17,7 +17,7 @@ private[actor] class Metric[@specialized(Int, Long, Double) T](symbol: String, b
 
   def renderValue(t: T): ByteString = ByteString(String.valueOf(t))
 
-  final def apply(t: T): MaterializedMetric =
+  def apply(t: T): MaterializedMetric =
     MaterializedMetric(prefix ++ renderValue(t) ++ suffix)
 
 }
@@ -27,7 +27,15 @@ object Metric {
     new Metric(symbol, bucket, samplingRate)
 }
 
-case class MaterializedMetric(bytes: ByteString)
+case class MaterializedMetric(private[actor] val bytes: ByteString) {
+  final def render(maxLength: Int): Option[ByteString] = {
+    if (bytes.length < maxLength) {
+      Some(bytes)
+    } else {
+      None
+    }
+  }
+}
 
 class Count(bucket: String, samplingRate: Double = 1.0)
   extends Metric[Int](Count.SYMBOL, bucket, samplingRate) {

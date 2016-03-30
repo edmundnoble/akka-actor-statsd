@@ -17,7 +17,6 @@ class IntegrationStatsActorSpec
     with Matchers
     with ImplicitSender {
 
-  /*
   "StatsActor" when {
     "initialized with an empty namespace" should {
       "send the expected message" in new Environment {
@@ -49,13 +48,13 @@ class IntegrationStatsActorSpec
     }
     "sending multiple messages quickly in sequence" should {
       "transmit all the messages" in new Environment {
-        val stats = system.actorOf(StatsActor.props(StatsConfig(address)), "stats-mmsg")
+        val stats = system.actorOf(StatsActor.props(StatsConfig(address).copy(transmitInterval = 1.second)), "stats-mmsg")
         val msgs = Seq(Timing("xyz")(40.seconds),
           Count.increment("ninjas"),
           Count.decrement("pirates"),
           Gauge("ratchet")(0xDEADBEEF))
         msgs.foreach(stats ! _)
-        expectMsg(ByteString(msgs.mkString("\n").stripLineEnd))
+        expectMsg(ByteString(msgs.map(_.bytes.utf8String).mkString("\n").stripLineEnd))
 
         shutdown()
       }
@@ -81,6 +80,6 @@ class IntegrationStatsActorSpec
       listener ! Udp.Unbind
     }
   }
-  */
+
 
 }

@@ -20,8 +20,7 @@ class UdpListenerActor(nextActor: ActorRef)
   def ready(socket: ActorRef): Receive = {
     case Udp.Received(data, remote) =>
       log.debug("received data length {}", data.length)
-      val str = data.decodeString("utf-8")
-      nextActor ! str
+      nextActor ! data
     case Udp.Unbind  => socket ! Udp.Unbind
     case Udp.Unbound => context.stop(self)
   }

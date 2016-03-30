@@ -5,20 +5,22 @@ import deploymentzone.actor.{MaterializedMetric, Metric}
 import deploymentzone.actor.validation.StatsDBucketValidator
 
 /**
- * Transforms the toString result value of a CounterMessage instance to include an
- * optional namespace.
- */
-private[actor] class NamespaceTransformer(val namespace: ByteString) extends (MaterializedMetric => ByteString) {
+  * Transforms the toString result value of a CounterMessage instance to include an
+  * optional namespace.
+  */
+private[actor] class NamespaceTransformer(val namespace: ByteString) extends ((MaterializedMetric, Int) => Option[ByteString]) {
 
   import NamespaceTransformer._
 
   require(StatsDBucketValidator(namespace.utf8String))
 
-  override def apply(metric: MaterializedMetric): ByteString = {
+  override def apply(metric: MaterializedMetric, maxLength: Int): Option[ByteString] = {
     if (namespace.isEmpty) {
-      metric.bytes
+      metric.render(maxLength)
     } else {
-      namespace ++ NAMESPACE_SEPARATOR ++ metric.bytes
+      for {
+        m <- metric.render(maxLength)
+      } yield namespace ++ NAMESPACE_SEPARATOR ++ m
     }
   }
 }

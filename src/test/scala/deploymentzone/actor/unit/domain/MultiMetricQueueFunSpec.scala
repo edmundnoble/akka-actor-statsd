@@ -3,11 +3,12 @@ package deploymentzone.actor.unit.domain
 import akka.util.ByteString
 import org.scalatest.FunSpec
 import deploymentzone.actor.domain.MultiMetricQueue
-import deploymentzone.actor.{ImplicitActorSystem, PacketSize}
+import deploymentzone.actor.{ImplicitActorSystem, PacketSize, TestBase}
 
 class MultiMetricQueueFunSpec
   extends FunSpec
-  with ImplicitActorSystem {
+  with ImplicitActorSystem
+  with TestBase {
 
   describe("A MultiMetricQueue") {
     def mkQueue = MultiMetricQueue(PacketSize.GIGABIT_ETHERNET)
@@ -25,6 +26,13 @@ class MultiMetricQueueFunSpec
         subject.enqueue(message)
         assert(subject.payload().contains(message))
       }
+
+      it("correctly measures bytesQueued") {
+        val subject = mkQueue
+        val message = ByteString("message")
+        subject.enqueue(message)
+        assert(subject.bytesQueued == 7)
+      }
     }
 
     describe("when having two elements") {
@@ -35,6 +43,13 @@ class MultiMetricQueueFunSpec
         assert(subject.payload().contains(ByteString(
           """message1
             |message2""".stripMargin)))
+      }
+
+      it("correctly measures bytesQueued") {
+        val subject = mkQueue
+        enqueueStr(subject, "message1")
+        enqueueStr(subject, "message2")
+        assert(subject.bytesQueued == 17)
       }
     }
 

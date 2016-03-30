@@ -11,7 +11,7 @@ private[actor] trait StatsProtocolImplementation
   private var scheduledDispatcher: ActorRef = _
   protected[this] val config: StatsConfig
 
-  protected def process(msg: MaterializedMetric): ByteString
+  protected def process(msg: MaterializedMetric): Option[ByteString]
 
   override def preStart() {
     connection ! UdpConnected.Connect
@@ -29,6 +29,6 @@ private[actor] trait StatsProtocolImplementation
   
   protected def connected: Actor.Receive = {
     case msg: MaterializedMetric =>
-      scheduledDispatcher ! process(msg)
+      process(msg) foreach { m => scheduledDispatcher ! m }
   }
 }
